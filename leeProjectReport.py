@@ -9,7 +9,8 @@ import datetime
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
 def usage(long_opts):
-    print('annotate_fastqc.py',"[","--"+" --".join(long_opts).replace("="," <val>"),"]")
+    print('Creates a TSV file that describes libraries made and sequenced in particular months\n')
+    print('leeProjectReport.py',"[","--"+" --".join(long_opts).replace("="," <val>"),"]")
     print(' use -h to print this message')
 
 def get_seq_samples_json_from_pinery():
@@ -57,14 +58,17 @@ def main(argv):
     test=False
     year=None
     month=None
+    usefqdate=False
 
-    long_opts=["test","study-name=","root-sample-name=","sample-name=","sequencer-run-name=","ius-SWID=","lane-SWID=","use-sw-file=", "use-pinery-file=", "year=", "month="]
+    long_opts=["use-sw-file=", "use-pinery-file=", "year=", "month=", "use-fastq-date"]
     try:
     	opts, args = getopt.getopt(argv,"h",long_opts)
     except getopt.GetoptError:
     	usage(long_opts)
     	sys.exit(2)
-    
+    if (len(opts)==0):
+	usage(long_opts)
+	sys.exit(2)
     for opt, arg in opts:
     	if opt == '-h':
     	    usage(long_opts)
@@ -79,6 +83,8 @@ def main(argv):
             year=int(arg)
         elif opt == '--month':
             month=int(arg)
+	elif opt == '--use-fastq-date':
+	    usefqdate=True
 	else:
 	    reportarg.append(opt)
 	    reportarg.append(arg)
@@ -123,9 +129,9 @@ def main(argv):
 
     final_dict={}
     for libkey, datvalues in sw_s.iteritems():
-        fastq=str(float(len(datvalues['sr'])/2))
+        fastq=str(len(datvalues['sr']))
         srst=",".join(datvalues['sr'])
-        final_dict[libkey]={'Project':datvalues['project'], 'Donor':datvalues['donor'], 'Library':datvalues['library'], "Sequencer runs":srst, "Libraries with FASTQ":fastq, 'FASTQs created':datvalues['fqdate']}
+        final_dict[libkey]={'Project':datvalues['project'], 'Donor':datvalues['donor'], 'Library':datvalues['library'], "Sequencer runs":srst, "Num FASTQs":fastq, 'FASTQs created':datvalues['fqdate']}
         final_dict[libkey]['Libraries in LIMS']="0"
         final_dict[libkey]['Libraries created']=[]
         
@@ -134,7 +140,7 @@ def main(argv):
         if (library not in final_dict):
             final_dict[libkey]={'Project':datvalues['project'], 'Donor':get_basename(library), 'Library':library, 
                 'Libraries created':datvalues['created'], 'Libraries in LIMS':str(len(datvalues['created']))}
-            final_dict[libkey]['Libraries with FASTQ']="0"
+            final_dict[libkey]['Num FASTQs']="0"
             final_dict[libkey]['Sequencer runs']="N/A"
             final_dict[libkey]['FASTQs created']=[]
         else:
@@ -142,13 +148,15 @@ def main(argv):
             final_dict[libkey]['Libraries created']=datvalues['created']
 
 
-    header=['Project','Donor', 'Library', 'Sequencer runs', 'Libraries in LIMS', 'Libraries with FASTQ', 'Libraries created', 'FASTQs created']
+    header=['Project','Donor', 'Library', 'Sequencer runs', 'Libraries in LIMS', 'Num FASTQs', 'Libraries created', 'FASTQs created']
     print("\t".join(header))
-
-
     for row in final_dict.values():
         printrow=[]
-        if (check_date(row['Libraries created'],year,month)):
+	usedatestr='Libraries created'
+	if (usefqdate):
+	    usedatest='FASTQs created'
+
+        if (check_date(row[usedatestr],year,month)):
             for n in header[0:6]:
                 printrow.append(row[n])
             printrow.append(",".join([str(x) for x in row['Libraries created']]))
