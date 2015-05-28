@@ -33,26 +33,26 @@ def main(argv):
       sys.exit()
 
    # Print out header of csv file
-   header = ",".join(['Project', 'Library', 'Run', 'Lane', 'Barcode', 'Sequence', 'Percentage'])
+   header = "\t".join(['Project', 'Library', 'Run', 'Lane', 'Barcode', 'Sequence', 'Percentage'])
    print(header)
 
    #open the file provenance report
-   with gzip.open(sw_filename) as tsv:
+   with open(sw_filename) as tsv:
        #parse the report into a map
       for line in csv.DictReader(tsv, delimiter="\t"):
          annos=None
 	 #find the FastQ files and calculates their adapter contamination numbers
          if 'chemical/seq-na-fastq-gzip' in line['File Meta-Type']:
-             firstbit=",".join([ line['Study Title'], line['Sample Name'], line['Sequencer Run Name'], line['Lane Number'], line['IUS Tag'] ])
+             firstbit="\t".join([ line['Study Title'], line['Sample Name'], line['Sequencer Run Name'], line['Lane Number'], line['IUS Tag'] ])
 
              # Get Trimmed reads percentage
              filePath = line['File Path'];
              m1 = re.match(".*?_(R[1|2])_.*", os.path.basename(filePath))
 
              if m1 is not None:
-                 firstbit = ",".join([firstbit, m1.group(1)])
+                 firstbit = "\t".join([firstbit, m1.group(1)])
              else:
-                 firstbit = firstbit + ","
+                 firstbit = firstbit + "\t"
 
              try:
                  p1 = subprocess.Popen(["zcat", filePath], stdout=subprocess.PIPE)
@@ -75,7 +75,7 @@ def main(argv):
              p2.stdout.close()
              m = re.findall('Trimmed\sreads.+\(\s+\d+\.\d+%\)', p3)
              m2 = re.findall('\d+\.\d+%', str(m))
-             line = firstbit + "," + m2[0]
+             line = firstbit + "\t" + m2[0]
 
              # Print out row of csv file
              print(line)
