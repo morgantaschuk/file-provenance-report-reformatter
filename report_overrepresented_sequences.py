@@ -33,7 +33,7 @@ def main(argv):
       sys.exit()
 
    # Print out header of csv file
-   header = "\t".join(['Project', 'Library', 'Run', 'Lane', 'Barcode', 'Sequence', 'Percentage'])
+   header = "\t".join(['Project', 'Library', 'Run', 'Lane', 'Barcode', 'Sequence', 'Percent reads trimmed'])
    print(header)
 
    #open the file provenance report
