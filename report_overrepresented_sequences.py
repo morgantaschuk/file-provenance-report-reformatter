@@ -32,10 +32,9 @@ def main(argv):
       print("Make sure you give arguments for --use-sw-file and --adapter-sequence.")
       sys.exit()
 
-   # Make csv file to write to
-   csvFile = open('AdapterContamination.csv','w')
+   # Print out header of csv file
    header = ",".join(['Project', 'Library', 'Run', 'Lane', 'Barcode', 'Sequence', 'Percentage'])
-   csvFile.write(header + "\n")
+   print(header)
 
    #open the file provenance report
    with gzip.open(sw_filename) as tsv:
@@ -45,25 +44,41 @@ def main(argv):
 	 #find the FastQ files and calculates their adapter contamination numbers
          if 'chemical/seq-na-fastq-gzip' in line['File Meta-Type']:
              firstbit=",".join([ line['Study Title'], line['Sample Name'], line['Sequencer Run Name'], line['Lane Number'], line['IUS Tag'] ])
+
              # Get Trimmed reads percentage
              filePath = line['File Path'];
              m1 = re.match(".*?_(R[1|2])_.*", os.path.basename(filePath))
+
              if m1 is not None:
                  firstbit = ",".join([firstbit, m1.group(1)])
              else:
                  firstbit = firstbit + ","
-             p1 = subprocess.Popen(["zcat", filePath], stdout=subprocess.PIPE)
+
+             try:
+                 p1 = subprocess.Popen(["zcat", filePath], stdout=subprocess.PIPE)
+             except subprocess.CalledProcessError as e:
+                 print(" : ".join([time.strftime("%x %X"), "ERROR: Could not open file", str(e), filePath]),file=sys.stderr) 
+                 p1.stdout.close()
+                 continue
+
              p2 = subprocess.Popen(["head", "-100000"], stdin=p1.stdout, stdout=subprocess.PIPE)
              p1.stdout.close()
-             p3 = subprocess.check_output("/oicr/local/analysis/sw/cutadapt/cutadapt-0.9.3/cutadapt -a %s -O 10 -o /dev/null -" % (adapter_seq), stderr=subprocess.STDOUT, stdin=p2.stdout, shell=True)
-             p2.stdout.close()
-             m = re.findall('\(\s+\d+\.\d+%\)', p3)
-             m2 = re.findall('\d+\.\d+%', str(m))
+             try:
+                 p3 = subprocess.check_output("/oicr/local/analysis/sw/cutadapt/cutadapt-0.9.3/cutadapt -a %s -O 10 -o /dev/null -" % (adapter_seq), stderr=subprocess.STDOUT, stdin=p2.stdout, shell=True)
+             except subprocess.CalledProcessError as e:
+                 print(" : ".join([time.strftime("%x %X"), "ERROR: Could not open file", str(e), filePath]),file=sys.stderr) 
+                 continue
+             except IOError as e:
+                 print(" : ".join([time.strftime("%x %X"), "ERROR: IOError", str(e), filePath]),file=sys.stderr)  
+                 continue
 
-             # Write to csv file
+             p2.stdout.close()
+             m = re.findall('Trimmed\sreads.+\(\s+\d+\.\d+%\)', p3)
+             m2 = re.findall('\d+\.\d+%', str(m))
              line = firstbit + "," + m2[0]
-             csvFile.write(line + "\n")
-   csvFile.close()
+
+             # Print out row of csv file
+             print(line)
 
 if __name__ == "__main__":
    main(sys.argv[1:])
