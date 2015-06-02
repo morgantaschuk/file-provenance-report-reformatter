@@ -53,27 +53,16 @@ def main(argv):
                  firstbit = "\t".join([firstbit, m1.group(1)])
              else:
                  firstbit = firstbit + "\t"
-
              try:
-                 p1 = subprocess.Popen(["zcat", filePath], stdout=subprocess.PIPE)
+                 process = subprocess.check_output('zcat %s | head -10000 | /oicr/local/analysis/sw/cutadapt/cutadapt-0.9.3/cutadapt -a %s -O 10 -o /dev/null -' % (filePath, adapter_seq), stderr=subprocess.STDOUT, shell=True)
              except subprocess.CalledProcessError as e:
-                 print(" : ".join([time.strftime("%x %X"), "ERROR: Could not open file", str(e), filePath]),file=sys.stderr) 
-                 p1.stdout.close()
-                 continue
-
-             p2 = subprocess.Popen(["head", "-100000"], stdin=p1.stdout, stdout=subprocess.PIPE)
-             p1.stdout.close()
-             try:
-                 p3 = subprocess.check_output("/oicr/local/analysis/sw/cutadapt/cutadapt-0.9.3/cutadapt -a %s -O 10 -o /dev/null -" % (adapter_seq), stderr=subprocess.STDOUT, stdin=p2.stdout, shell=True)
-             except subprocess.CalledProcessError as e:
-                 print(" : ".join([time.strftime("%x %X"), "ERROR: Could not open file", str(e), filePath]),file=sys.stderr) 
+                 print(" : ".join([time.strftime("%x %X"), "ERROR: Could not open file", str(e), filePath]),file=sys.stderr)
                  continue
              except IOError as e:
-                 print(" : ".join([time.strftime("%x %X"), "ERROR: IOError", str(e), filePath]),file=sys.stderr)  
+                 print(" : ".join([time.strftime("%x %X"), "ERROR: IOError", str(e), filePath]),file=sys.stderr)
                  continue
 
-             p2.stdout.close()
-             m = re.findall('Trimmed\sreads.+\(\s+\d+\.\d+%\)', p3)
+             m = re.findall('Trimmed\sreads.+\(\s+\d+\.\d+%\)', process)
              m2 = re.findall('\d+\.\d+%', str(m))
              line = firstbit + "\t" + m2[0]
 
