@@ -1,0 +1,82 @@
+#!/bin/bash
+
+export PERL5LIB=/oicr/local/analysis/lib/perl/pipe/lib/perl5
+export JVM_OPTS=-Xmx500M
+export SGE_CELL=default
+export SGE_ROOT=/opt/ogs2011.11
+export SGE_CLUSTER_NAME=p6444
+export fpr_d=`date +%Y%m%d`
+
+cd /u/seqprodbio/spb-seqware-production/non-specific
+
+find /.mounts/labs/seqprodbio/private/backups/hsqwprod-db/ -regextype sed -regex ".*seqware_files_report.*" | sort -r | head -1 | xargs zcat > "${fpr_d}_tmp-report.tsv"
+
+tail -n +2 "${fpr_d}_tmp-report.tsv" > "temp_${fpr_d}_tmp-report.tsv"
+head -1 "${fpr_d}_tmp-report.tsv" > "${fpr_d}_header_tmp-report.tsv"
+cat "temp_${fpr_d}_tmp-report.tsv" > "${fpr_d}_tmp-report.tsv"
+
+FILE_SIZE=`cat "${fpr_d}_tmp-report.tsv" | wc -l`
+CLUSTER_SIZE=200
+BLOCK_SIZE=$((FILE_SIZE / CLUSTER_SIZE))
+BLOCK_SIZE=$((BLOCK_SIZE + 1))
+COUNT=0
+BLOCK_NUMBER=1
+
+rm "temp_${fpr_d}_tmp-report.tsv"
+
+# Create base files for each block
+for i in {1..200}
+do 
+        head -1 "${fpr_d}_header_tmp-report.tsv" > "${fpr_d}_${i}_tmp-report.tsv"; 
+        
+done
+
+# Populate block files
+while read p; do
+	echo "${p}" >> "${fpr_d}_${BLOCK_NUMBER}_tmp-report.tsv"
+	COUNT=$((COUNT+1))
+	if [ $BLOCK_SIZE -eq $COUNT ]; then
+		BLOCK_NUMBER=$((BLOCK_NUMBER + 1))
+		COUNT=0
+	fi
+done < "${fpr_d}_tmp-report.tsv"
+
+# Create base file for all projects
+for i in `cut -f2 "${fpr_d}_tmp-report.tsv" | sort | uniq`
+do
+	echo "Project	Library	Run	Lane	Barcode	Sequence	Percent reads trimmed" > "${i}_overrepresented_sequences.tsv"
+done
+
+for i in {1..200}
+do 
+	/opt/ogs2011.11/bin/linux-x64/qsub -b y -N "gsi_adapter_contamination_${i}" -o /u/seqprodbio/spb-seqware-production/var/log/adapter_contamination.log -e /u/seqprodbio/spb-seqware-production/var/log/adapter_contamination.log -cwd -l h_vmem=8G "bash /u/seqprodbio/spb-seqware-production/non-specific/run_adapter_contamination.sh ${i}"
+	
+done
+
+JOBS_LEFT=`/opt/ogs2011.11/bin/linux-x64/qstat | grep "gsi_adapte" | wc -l`
+
+while true;
+do
+	if [ $JOBS_LEFT -eq 0 ]; then
+		break
+	fi
+	JOBS_LEFT=`/opt/ogs2011.11/bin/linux-x64/qstat | grep "gsi_adapte" | wc -l`
+	sleep 5
+done
+
+for i in `cut -f2 "${fpr_d}_tmp-report.tsv" | sort | uniq`
+do
+	cp "${i}_overrepresented_sequences.tsv" "/oicr/data/archive/web/hsqwprod/OverrepresentedSequences/${i}_overrepresented_sequences.tsv"
+	rm "${i}_overrepresented_sequences.tsv"
+done
+
+chmod 664 "/oicr/data/archive/web/hsqwprod/OverrepresentedSequences/*"
+
+# Clean up files
+rm "${fpr_d}_header_tmp-report.tsv"
+rm "${fpr_d}_tmp-report.tsv"
+#for i in {1..200}
+#do
+#	rm "${fpr_d}_${i}_tmp-report.tsv"
+
+#done
