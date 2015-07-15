@@ -13,8 +13,9 @@ def usage(long_opts):
 
 def main(argv):
    sw_filename=None
-   adapter_seq=None
-   long_opts=["use-sw-file=", "adapter-sequence="]
+   adapter_seq_r1=None
+   adapter_seq_r2=None
+   long_opts=["use-sw-file=", "adapter-sequence-r1=", "adapter-sequence-r2="]
    try:
       opts, args = getopt.getopt(argv,"h",long_opts)
    except getopt.GetoptError:
@@ -26,10 +27,12 @@ def main(argv):
          sys.exit()
       elif opt == '--use-sw-file':
          sw_filename=arg
-      elif opt == '--adapter-sequence':
-	adapter_seq=arg
-   if adapter_seq is None or sw_filename is None:
-      print("Make sure you give arguments for --use-sw-file and --adapter-sequence.")
+      elif opt == '--adapter-sequence-r1':
+	adapter_seq_r1=arg
+      elif opt == '--adapter-sequence-r2':
+        adapter_seq_r2=arg
+   if adapter_seq_r1 is None or adapter_seq_r2 is None or sw_filename is None:
+      print("Make sure you give arguments for --use-sw-file and, --adapter-sequence-r1, and --adapter-sequence-r2.")
       sys.exit()
 
    # Print out header of csv file
@@ -54,7 +57,10 @@ def main(argv):
              else:
                  firstbit = firstbit + "\t"
              try:
-                 process = subprocess.check_output('zcat %s | head -10000 | /oicr/local/analysis/sw/cutadapt/cutadapt-0.9.3/cutadapt -a %s -O 10 -o /dev/null -' % (filePath, adapter_seq), stderr=subprocess.STDOUT, shell=True)
+                 if re.match(".*?_(R1)_.*", os.path.basename(filePath)) is not None:
+                     process = subprocess.check_output('zcat %s | head -10000 | /oicr/local/analysis/sw/cutadapt/cutadapt-0.9.3/cutadapt -a %s -O 10 -o /dev/null -' % (filePath, adapter_seq_r1), stderr=subprocess.STDOUT, shell=True)
+                 else:
+                    process = subprocess.check_output('zcat %s | head -10000 | /oicr/local/analysis/sw/cutadapt/cutadapt-0.9.3/cutadapt -a %s -O 10 -o /dev/null -' % (filePath, adapter_seq_r2), stderr=subprocess.STDOUT, shell=True) 
              except subprocess.CalledProcessError as e:
                  print(" : ".join([time.strftime("%x %X"), "ERROR: Could not open file", str(e), filePath]),file=sys.stderr)
                  continue
